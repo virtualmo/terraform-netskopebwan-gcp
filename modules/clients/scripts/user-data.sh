@@ -1,0 +1,2 @@
+  #cloud-config
+  password: ${password}
