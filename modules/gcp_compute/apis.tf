@@ -4,5 +4,5 @@
 #------------------------------------------------------------------------------
 
 resource "time_sleep" "api_delay" {
-  create_duration = "30s"
+  create_duration = "60s"
 }

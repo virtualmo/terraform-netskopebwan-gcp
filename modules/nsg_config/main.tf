@@ -40,7 +40,7 @@ resource "netskopebwan_gateway" "primary" {
 # Netskope GW creation can take a few seconds to
 # create all dependent services in backend
 resource "time_sleep" "primary_gw_propagation" {
-  create_duration = "30s"
+  create_duration = "60s"
 
   triggers = {
     gateway_id = netskopebwan_gateway.primary.id
@@ -61,76 +61,93 @@ resource "netskopebwan_gateway" "secondary" {
 
 resource "time_sleep" "secondary_gw_propagation" {
   count           = var.netskope_gateway_config.ha_enabled ? 1 : 0
-  create_duration = "30s"
+  create_duration = "60s"
 
   triggers = {
     gateway_id = netskopebwan_gateway.secondary[0].id
   }
 }
 
-resource "netskopebwan_gateway_interface" "primary" {
-  for_each   = local.enabled_interfaces
+resource "netskopebwan_gateway_interface" "primary_GE1" {
   gateway_id = time_sleep.primary_gw_propagation.triggers["gateway_id"]
-  name       = upper(each.key)
+  name       = "GE1"
   type       = "ethernet"
   addresses {
-    address            = cidrhost(var.gcp_network_config.subnets[each.key].ip_cidr_range, 2)
+    address            = cidrhost(var.gcp_network_config.subnets["ge1"].ip_cidr_range, 2)
     address_assignment = "static"
     address_family     = "ipv4"
     dns_primary        = var.netskope_gateway_config.dns_primary
     dns_secondary      = var.netskope_gateway_config.dns_secondary
-    gateway            = var.gcp_network_config.subnets[each.key].gateway_address
-    mask               = cidrnetmask(var.gcp_network_config.subnets[each.key].ip_cidr_range)
+    gateway            = var.gcp_network_config.subnets["ge1"].gateway_address
+    mask               = cidrnetmask(var.gcp_network_config.subnets["ge1"].ip_cidr_range)
   }
-  dynamic "overlay_setting" {
-    for_each = lookup(merge(local.public_overlay_interfaces, local.private_overlay_interfaces), each.key, "") != "" ? [1] : []
-    content {
-      is_backup           = false
-      tx_bw_kbps          = 1000000
-      rx_bw_kbps          = 1000000
-      bw_measurement_mode = "manual"
-      tag                 = lookup(local.public_overlay_interfaces, each.key, "") != "" ? "wired" : "private"
-    }
+  overlay_setting {
+    is_backup           = false
+    tx_bw_kbps          = 1000000
+    rx_bw_kbps          = 1000000
+    bw_measurement_mode = "manual"
+    tag                 = "wired"
   }
-  enable_nat  = lookup(local.public_overlay_interfaces, each.key, "") != "" ? true : false
+  enable_nat  = true
   mode        = "routed"
   is_disabled = false
-  zone        = lookup(local.public_overlay_interfaces, each.key, "") != "" ? "untrusted" : "trusted"
+  zone        = "untrusted"
 }
 
-resource "netskopebwan_gateway_interface" "secondary" {
-  for_each = {
-    for intf, vpc in local.enabled_interfaces : intf => vpc
-    if var.netskope_gateway_config.ha_enabled
+resource "netskopebwan_gateway_interface" "primary_GE2" {
+  gateway_id = time_sleep.primary_gw_propagation.triggers["gateway_id"]
+  name       = "GE2"
+  type       = "ethernet"
+  addresses {
+    address_assignment = "dhcp"
+    address_family     = "ipv4"
   }
+  do_advertise = true
+  mode        = "routed"
+  is_disabled = false
+  zone        = "trusted"
+}
 
+resource "netskopebwan_gateway_interface" "secondary_GE1" {
   gateway_id = time_sleep.secondary_gw_propagation[0].triggers["gateway_id"]
-  name       = upper(each.key)
+  name       = "GE1"
   type       = "ethernet"
   addresses {
-    address            = cidrhost(var.gcp_network_config.subnets[each.key].ip_cidr_range, 3)
+    address            = cidrhost(var.gcp_network_config.subnets["ge1"].ip_cidr_range, 3)
     address_assignment = "static"
     address_family     = "ipv4"
     dns_primary        = var.netskope_gateway_config.dns_primary
     dns_secondary      = var.netskope_gateway_config.dns_secondary
-    gateway            = ""
-    mask               = cidrnetmask(var.gcp_network_config.subnets[each.key].ip_cidr_range)
+    gateway            = var.gcp_network_config.subnets["ge1"].gateway_address
+    mask               = cidrnetmask(var.gcp_network_config.subnets["ge1"].ip_cidr_range)
   }
-  dynamic "overlay_setting" {
-    for_each = lookup(merge(local.public_overlay_interfaces, local.private_overlay_interfaces), each.key, "") != "" ? [1] : []
-    content {
-      is_backup           = false
-      tx_bw_kbps          = 1000000
-      rx_bw_kbps          = 1000000
-      bw_measurement_mode = "manual"
-      tag                 = lookup(local.public_overlay_interfaces, each.key, "") != "" ? "wired" : "private"
-    }
+  overlay_setting {
+    is_backup           = false
+    tx_bw_kbps          = 1000000
+    rx_bw_kbps          = 1000000
+    bw_measurement_mode = "manual"
+    tag                 = "wired"
   }
-  enable_nat  = lookup(local.public_overlay_interfaces, each.key, "") != "" ? true : false
+  enable_nat  = true
   mode        = "routed"
   is_disabled = false
-  zone        = lookup(local.public_overlay_interfaces, each.key, "") != "" ? "untrusted" : "trusted"
+  zone        = "untrusted"
 }
+
+resource "netskopebwan_gateway_interface" "secondary_GE2" {
+  gateway_id = time_sleep.secondary_gw_propagation[0].triggers["gateway_id"]
+  name       = "GE2"
+  type       = "ethernet"
+  addresses {
+    address_assignment = "dhcp"
+    address_family     = "ipv4"
+  }
+  do_advertise = true
+  mode        = "routed"
+  is_disabled = false
+  zone        = "trusted"
+}
+
 
 // Static Route
 resource "netskopebwan_gateway_staticroute" "primary" {

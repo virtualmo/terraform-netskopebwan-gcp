@@ -54,7 +54,7 @@ variable "gcp_compute" {
   description = "GCP Instance Config"
   type = object({
     instance_type  = string
-    image_id       = optional(string, "projects/ns-bwan-prod/global/images/netskope-unified-sase-virtual-gateway-r5-2-41")
+    image_id       = optional(string, "projects/infiot-public-images/global/images/infiot-edge")
     primary_zone   = optional(string)
     secondary_zone = optional(string)
   })
