@@ -28,7 +28,7 @@ locals {
 
 // Gateway Resource 
 resource "netskopebwan_gateway" "primary" {
-  name  = var.netskope_gateway_config.gateway_name
+  name  = "${var.netskope_gateway_config.gateway_name}-primary"
   model = var.netskope_gateway_config.gateway_model
   role  = var.netskope_gateway_config.gateway_role
   assigned_policy {
@@ -49,7 +49,7 @@ resource "time_sleep" "primary_gw_propagation" {
 
 resource "netskopebwan_gateway" "secondary" {
   count = var.netskope_gateway_config.ha_enabled ? 1 : 0
-  name  = "${var.netskope_gateway_config.gateway_name}-ha"
+  name  = "${var.netskope_gateway_config.gateway_name}-secondary"
   model = var.netskope_gateway_config.gateway_model
   role  = var.netskope_gateway_config.gateway_role
   assigned_policy {
